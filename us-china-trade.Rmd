@@ -1,0 +1,137 @@
+---
+title: "china.us.trade"
+author: "Michael Montella"
+date: "12/12/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(janitor)
+library(readr)
+library(stringr)
+library(fs)
+library(splitstackshape)
+library(shiny)
+library(kableExtra)
+library(dplyr)
+library(formattable)
+library(lubridate)
+library(plotly)
+library(tidyverse)
+```
+
+
+```{r, message = FALSE, cache = TRUE}
+
+#cache = TRUE saves output of a code chunk so we don't need to redownload files each time we execute code chunk
+
+download.file(url = "https://www.wto.org/english/res_e/statis_e/daily_update_e/services_annual_dataset.zip", destfile = "services_annual_dataset.zip")
+
+unzip("services_annual_dataset.zip")
+
+annual <- read_delim("services_annual_dataset.csv", delim = "|", col_names = FALSE, escape_double = FALSE)
+
+file_delete(c("services_annual_dataset.zip", "services_annual_dataset.csv"))
+```
+
+
+```{r, message = FALSE, cache = TRUE}
+#cache = TRUE saves output of a code chunk so we don't need to redownload files each time we execute code chunk
+
+goods <- read_excel("US_exportstoChina.xlsx", skip = 1)
+```
+
+```{r}
+annual_split <- cSplit(annual, "X1", ",") 
+
+#services_Wto is the data frame I need to work with for the first part of the shiny app. From this data frame, users will be able to select the year and the service description, which will then display a bar graph of imports/exports for the selection. Millions of USD would be the y-axis variable, and X1_08 (Flow direction) would be the y-axis variable. 
+#services_Wto <- annual_split %>%
+  #filter(X1_04 == "China" & X1_02 == "United States of America") %>%
+  #select(X1_02, X1_04, X1_06, X1_08, X1_09, X1_11) %>%
+  #rename("Reporting Economy" = X1_02, "Partner Economy" = X1_04, "Year" = X1_09, "Millions of USD" = X1_11)
+
+#write_rds(services_Wto, "services_Wto.rds")
+
+# A second data frame will be needed for the second part of the shiny app. This app will be a line graph with year  # on the x-axis and millions of USD on the y-axis, with two lines representing either import or export. Users will  # select the type of service they want to see the distinction for.
+
+services_Wto <- annual_split %>%
+# X1_04 represents the partner economy, which we want to be China. 
+# X1_02 represents the reporting economy, which we want to be the US
+  filter(X1_04 == "China" & X1_02 == "United States of America") %>%
+# X1_06 provides the type of service, which is the selection users will later choose
+# X1_08 tells us whether the transaction was an import or export from the US' perspective
+# X1_09 tells us the year 
+# X1_11 tells us the amount of the transaction in millions of USD
+  select(X1_02, X1_04, X1_06, X1_08, X1_09, X1_11) %>%
+  rename("Reporting Economy" = X1_02, "Partner Economy" = X1_04, "Year" = X1_09, "Value" = X1_11) %>%
+  filter(Year != "M", Year != "X") %>%
+  filter(X1_08 == "Imports" | X1_08 == "Exports")
+# the X1_11 (Millions of USD) variable was a character variable and needed to be changed to a numeric variable; as a # character variable, the y-axis in the ggplot was displaying out of ascending order
+# https://stackoverflow.com/questions/30916137/why-is-my-graphs-y-axis-not-in-the-right-order
+services_Wto$Value <- as.numeric(as.character(services_Wto$Value))
+# test is a mock ggplot that is the skeleton for the later shiny app
+write_rds(services_Wto, "services.rds")
+
+
+# This is a ggplot for what I am looking for:
+#test <- services_Wto %>%
+# we are filtering for X1_06 == "Services" to simulate a user selecting "Services"
+  #filter(X1_06 == "Services") 
+# within the ggplot, the group = X1_08 aes connects points within that defined group. For this ggplot that means all # import values are connected and all export values are connected
+# the theme(legend.title...) phrase removes the legend title 
+# https://stackoverflow.com/questions/14771546/remove-legend-title-in-ggplot
+#ggplot(data = test, aes(x = Year, y = X1_11, color = X1_08, group = X1_08)) + geom_point() + geom_line() + labs(title = "US-China Trade in Services over Time") + ylab("Millions of USD") + xlab("Year") + theme(text = element_text(family = "Times New Roman", size = 14), panel.background = element_blank()) + theme(legend.title=element_blank())
+```
+
+```{r}
+# the goods data frame needs to be cleaned. First, the "Indicator" column name should be "Reporting Economy", with only values = "United States of America"
+# we need to create a column that = year
+#https://stackoverflow.com/questions/2185252/reshaping-data-frame-from-wide-to-long-format  
+goods_clean <- reshape(goods, direction = "long", varying = lst(names(goods)[4:20]), v.names = "Value", 
+        idvar = c("Reporting Economy","Product/Sector", "Partner Economy"), timevar = "Year", times = 2001:2017) 
+
+select_goods <- goods_clean %>%
+  select("Reporting Economy","Product/Sector", "Partner Economy", "Year", "Value") %>%
+  group_by("Product/Sector") %>%
+  rename("Sector" = "Product/Sector") %>%
+  mutate(Sector = case_when(Sector == "SI3_AGG - TO - Total merchandise" ~ "Total Merchandise", 
+                            Sector == "SI3_AGG - AG - Agricultural products" ~ "Argicultural Products",
+                            Sector == "SI3_AGG - AGFO - Food" ~ "Food",
+                            Sector == "SI3_AGG - AGFOFI - Fish" ~ "Fish",
+                            Sector == "SI3_AGG - AGFOOF - Other food products" ~ "Other Food",
+                            Sector == "SI3_AGG - AGRA - Raw materials" ~ "Raw Materials",
+                            Sector == "SI3_AGG - MI - Fuels and mining products" ~ "Fuels and Mining",
+                            Sector == "SI3_AGG - MIOR - Ores and other minerals" ~ "Ores and Other Minerals",
+                            Sector == "SI3_AGG - MIFU - Fuels" ~ "Fuels",
+                            Sector == "SI3_AGG - MINF - Non-ferrous metals" ~ "Non-ferrous Metals",
+                            Sector == "SI3_AGG - MA - Manufactures" ~ "Manufactures",
+                            Sector == "SI3_AGG - MAIS - Iron and steel" ~ "Iron and Steel",
+                            Sector == "SI3_AGG - MACH - Chemicals" ~ "Chemicals",
+                            Sector == "SI3_AGG - MACHPH - Pharmaceuticals" ~ "Pharmaceuticals",
+                            Sector == "SI3_AGG - MACHOC - Other chemicals" ~ "Other Chemicals",
+                            Sector == "SI3_AGG - MAOS - Other semi-manufactures" ~ "Other Semi-manufactures",
+                            Sector == "SI3_AGG - MAMT - Machinery and transport equipment" ~ "Machinery and Transport Equipment",
+                            Sector == "SI3_AGG - MAMTOF - Office and telecom equipment" ~ "Office and Telecom Equipment",
+                            Sector == "SI3_AGG - MAMTOTEP - Electronic data processing and office equipment" ~ "Electronic data processing and office equipment",
+                            Sector == "SI3_AGG - MAMTOTTL - Telecommunications equipment" ~ "Telecommunications Equipment",
+                            Sector == "SI3_AGG - MAMTOTIC - Integrated circuits and electronic components" ~ "Integrated circuits and electronic components",
+                            Sector == "SI3_AGG - MAMTTE - Transport equipment" ~ "Transport equipment",
+                            Sector == "SI3_AGG - MAMTAU - Automotive products" ~ "Automotive products",
+                            Sector == "SI3_AGG - MAMTTEOT - Other transport equipment" ~ "Other transport equipment",
+                            Sector == "SI3_AGG - MAMTOM - Other machinery" ~ "Other machinery",
+                            Sector == "SI3_AGG - MATE - Textiles" ~ "Textiles",
+                            Sector == "SI3_AGG - MACL - Clothing" ~ "Clothing",
+                            Sector == "SI3_AGG - MAOC - Other manufactures" ~ "Other manufactures",
+                            Sector == "SI3_AGG - MAOCPH - Personal and household goods" ~ "Personal and household goods",
+                            Sector == "SI3_AGG - MAOCSC - Scientific and controlling instruments" ~ "Scientific and controlling instruments",
+                            Sector == "SI3_AGG - MAOCMM - Miscellaneous manufactures" ~ "Miscellaneous manufactures")) 
+
+write_rds(select_goods, "goods.rds")
+
+# below is code for a test, non-interactive plot
+#test_2 <- select_goods %>%
+  #filter(Sector == "Miscellaneous manufactures")
+#ggplot(data = test_2, aes(x = Year, y = Value)) + geom_point() + geom_line() + labs(title = "US-China Trade in Goods over Time") + ylab("Millions of USD") + xlab("Year") + theme(text = element_text(family = "Times New Roman", size = 14), panel.background = element_blank()) + theme(legend.title=element_blank())  
+```
