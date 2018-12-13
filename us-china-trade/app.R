@@ -107,7 +107,7 @@ ui <- navbarPage(
                                 "Scientific and controlling instruments" = "Scientific and controlling instruments",
                                 "Miscellaneous manufactures" = "Miscellaneous manufactures"),
                     selected = "Total Merchandise",
-                    multiple = TRUE),
+                    multiple = FALSE),
         h6("Source: World Trade Organization")),
       mainPanel(
         tabsetPanel(
