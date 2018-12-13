@@ -46,15 +46,7 @@ goods <- read_excel("US_exportstoChina.xlsx", skip = 1)
 ```{r}
 annual_split <- cSplit(annual, "X1", ",") 
 
-#services_Wto is the data frame I need to work with for the first part of the shiny app. From this data frame, users will be able to select the year and the service description, which will then display a bar graph of imports/exports for the selection. Millions of USD would be the y-axis variable, and X1_08 (Flow direction) would be the y-axis variable. 
-#services_Wto <- annual_split %>%
-  #filter(X1_04 == "China" & X1_02 == "United States of America") %>%
-  #select(X1_02, X1_04, X1_06, X1_08, X1_09, X1_11) %>%
-  #rename("Reporting Economy" = X1_02, "Partner Economy" = X1_04, "Year" = X1_09, "Millions of USD" = X1_11)
-
-#write_rds(services_Wto, "services_Wto.rds")
-
-# A second data frame will be needed for the second part of the shiny app. This app will be a line graph with year  # on the x-axis and millions of USD on the y-axis, with two lines representing either import or export. Users will  # select the type of service they want to see the distinction for.
+# This data frame will provide the line graph with year  # on the x-axis and millions of USD on the y-axis, with two lines representing either import or export. Users will  # select the type of service they want to see the distinction for.
 
 services_Wto <- annual_split %>%
 # X1_04 represents the partner economy, which we want to be China. 
@@ -74,9 +66,10 @@ services_Wto$Value <- as.numeric(as.character(services_Wto$Value))
 # test is a mock ggplot that is the skeleton for the later shiny app
 write_rds(services_Wto, "services.rds")
 
-playagain <- services_Wto %>%
-  filter(Year == "2005" & X1_08 == "Exports") %>%
-  select(X1_06, Value)
+# using this to look for issues with df
+# playagain <- services_Wto %>%
+  # filter(Year == "2005" & X1_08 == "Exports") %>%
+  # select(X1_06, Value)
 
 
 # This is a ggplot for what I am looking for:
