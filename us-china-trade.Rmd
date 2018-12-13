@@ -74,6 +74,10 @@ services_Wto$Value <- as.numeric(as.character(services_Wto$Value))
 # test is a mock ggplot that is the skeleton for the later shiny app
 write_rds(services_Wto, "services.rds")
 
+playagain <- services_Wto %>%
+  filter(Year == "2005" & X1_08 == "Exports") %>%
+  select(X1_06, Value)
+
 
 # This is a ggplot for what I am looking for:
 #test <- services_Wto %>%
@@ -126,12 +130,31 @@ select_goods <- goods_clean %>%
                             Sector == "SI3_AGG - MAOC - Other manufactures" ~ "Other manufactures",
                             Sector == "SI3_AGG - MAOCPH - Personal and household goods" ~ "Personal and household goods",
                             Sector == "SI3_AGG - MAOCSC - Scientific and controlling instruments" ~ "Scientific and controlling instruments",
-                            Sector == "SI3_AGG - MAOCMM - Miscellaneous manufactures" ~ "Miscellaneous manufactures")) 
+                            Sector == "SI3_AGG - MAOCMM - Miscellaneous manufactures" ~ "Miscellaneous manufactures")) %>%
+# these goods categories need to be removed because they're redundant, grouping categories used by WTO
+  filter(Sector != "Argicultural Products", Sector != "Food", Sector != "Fuels and Mining", Sector != "Manufactures", Sector != "Chemicals", Sector != "Machinery and Transport Equipment", Sector != "Office and Telecom Equipment", Sector != "Transport equipment", Sector != "Other manufactures")
 
-write_rds(select_goods, "goods.rds")
+write_rds(select_goods, "goods2.rds")
 
 # below is code for a test, non-interactive plot
 #test_2 <- select_goods %>%
   #filter(Sector == "Miscellaneous manufactures")
 #ggplot(data = test_2, aes(x = Year, y = Value)) + geom_point() + geom_line() + labs(title = "US-China Trade in Goods over Time") + ylab("Millions of USD") + xlab("Year") + theme(text = element_text(family = "Times New Roman", size = 14), panel.background = element_blank()) + theme(legend.title=element_blank())  
 ```
+
+```{r}
+goods_compare <- select_goods %>%
+  ungroup("Product/Sector") %>%
+  filter(Sector == "Total Merchandise") %>%
+  select(Sector, Year, Value) %>%
+  filter(Year > 2004 & Year < 2017) %>%
+  mutate(Sector = case_when(Sector == "Total Merchandise" ~ "Goods"))
+services_compare <- services_Wto %>%
+  filter(X1_06 == "Services" & X1_08 == "Exports") %>%
+  select(X1_06, Year, Value) %>%
+  rename(Sector = "X1_06")
+export_comparison <- rbind(goods_compare, services_compare)
+write_rds(export_comparison, "export_comparison.rds")
+#ggplot(data = export_comparison, aes(x = Year, y = Value, color = Sector, group = Sector)) + geom_point() + geom_line() + labs(title = "US Exports to China") + ylab("Millions of USD") + xlab("Year") + theme(text = element_text(family = "Times New Roman", size = 14), panel.background = element_blank()) + theme(legend.title=element_blank())  
+```
+
