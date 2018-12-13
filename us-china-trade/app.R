@@ -15,6 +15,7 @@ library(plotly)
 
 data <- read_rds("services copy.rds")
 select_goods <- read_rds("goods2 copy.rds")
+export_comparison <- read_rds("export_comparison2 copy.rds")
 
 # Define UI for application 
 ui <- navbarPage(
@@ -107,7 +108,7 @@ ui <- navbarPage(
                                 "Scientific and controlling instruments" = "Scientific and controlling instruments",
                                 "Miscellaneous manufactures" = "Miscellaneous manufactures"),
                     selected = "Total Merchandise",
-                    multiple = FALSE),
+                    multiple = TRUE),
         h6("Source: World Trade Organization")),
       mainPanel(
         tabsetPanel(
@@ -118,12 +119,26 @@ ui <- navbarPage(
         )
       )
     )
+  ),
+  tabPanel(
+    title = "US Exports Compared",
+    sidebarLayout(
+      sidebarPanel(h4("US Exports More Goods than Services to China"), h5("Source: World Trade Organization")),
+      mainPanel(
+        tabsetPanel(
+          tabPanel(
+            title = "US Exports to China",
+            plotlyOutput("lineplot_c")
+          )
+        )
+      )
+    )
   )
 )
 
 
 ###########################
-##Define the server logic##
+## Define the server logic ##
 ###########################
 
 server <- function(input, output) { 
@@ -207,6 +222,21 @@ server <- function(input, output) {
       theme(legend.title=element_blank())
     
     ggplotly(lineplot_b)
+  })
+  
+  output$lineplot_c <- renderPlotly({
+    
+    lineplot_c <- export_comparison %>%
+      ggplot(aes(x = Year, y = Value, color = Sector, group = Sector)) + 
+      geom_point() + 
+      geom_line() + 
+      labs(title = "US Exports to China") + 
+      ylab("Millions of USD") + 
+      xlab("Year") + 
+      theme(text = element_text(family = "Times New Roman", size = 14), panel.background = element_blank()) + 
+      theme(legend.title=element_blank()) 
+    
+    ggplotly(lineplot_c)
   })
 }
 
